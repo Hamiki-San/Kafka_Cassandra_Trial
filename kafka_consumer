@@ -1,0 +1,107 @@
+import time
+import json
+from confluent_kafka import Consumer, KafkaException, OFFSET_BEGINNING
+import base64 # If you decide to Base64 encode images in JSON
+import os # For saving simulated data
+
+# --- Consumer Configuration ---
+# Make sure max.partition.fetch.bytes matches or is greater than your producer's
+# message.max.bytes and the broker's message.max.bytes.
+MAX_FETCH_SIZE_BYTES = 6 * 1024 * 1024 # 6 MB
+
+consumer_config = {
+    'bootstrap.servers': 'localhost:9092',
+    'group.id': 'image_processing_group', # All consumers with the same group.id work together
+    'auto.offset.reset': 'earliest',     # Start from the beginning of the topic if no offset committed
+    'enable.auto.commit': True,          # Automatically commit offsets
+    'auto.commit.interval.ms': 5000,     # Commit every 5 seconds
+    'client.id': 'image-consumer-app',
+    'max.partition.fetch.bytes': MAX_FETCH_SIZE_BYTES, # Max data fetched per partition in one request
+    'fetch.max.bytes': 52428800, # Default is 50MB, total max data fetched per poll call across all partitions
+    'broker.version.fallback': '1.0.0', # <--- ADD THIS LINE
+    'api.version.request': 'true'       # <--- ADD THIS LINE (often goes with fallback)
+}
+
+consumer = Consumer(consumer_config)
+
+# --- Define Kafka Topic ---
+TOPIC_NAME = 'position_image'
+
+# --- Optional: Callback to reset offset for new consumers (useful for testing) ---
+def reset_offset(consumer, partitions):
+    """
+    Called when the consumer is assigned partitions.
+    Resets offset to beginning for all assigned partitions.
+    """
+    for p in partitions:
+        p.offset = OFFSET_BEGINNING
+    consumer.assign(partitions)
+    print(f"INFO: Consumer assigned partitions: {partitions}. Resetting offsets to beginning.")
+
+# --- Consumer Logic ---
+def consume_sensor_data():
+    print(f"--- Starting Consumer for Topic: {TOPIC_NAME} in Group: {consumer_config['group.id']} ---")
+
+    try:
+        # Subscribe to the topic. 'on_assign' callback is optional.
+        consumer.subscribe([TOPIC_NAME], on_assign=reset_offset)
+
+        while True:
+            # Poll for messages with a timeout
+            msg = consumer.poll(timeout=1.0) # Poll for 1 second
+
+            if msg is None:
+                # print("Waiting for messages...") # Uncomment to see frequent polling
+                continue
+
+            if msg.error():
+                if msg.error().code() == KafkaException._PARTITION_EOF:
+                    # End of partition event - normal, not an error
+                    # print(f"INFO: Reached end of partition {msg.partition()} for topic {msg.topic()}")
+                    pass
+                elif msg.error():
+                    print(f"ERROR: Consumer error: {msg.error()}")
+                    continue # Skip to next poll if there's an error
+            else:
+                # Process the message
+                key_bytes = msg.key()
+                value_bytes = msg.value()
+
+                if key_bytes:
+                    try:
+                        # Assuming key is JSON metadata
+                        metadata = json.loads(key_bytes.decode('utf-8'))
+                        print(f"Received metadata (Key): {metadata}")
+                    except json.JSONDecodeError:
+                        print(f"Received non-JSON key: {key_bytes.decode('utf-8', errors='ignore')}")
+                else:
+                    print("Received message with no key.")
+
+                if value_bytes:
+                    print(f"Received data (Value) from topic '{msg.topic()}', "
+                          f"partition [{msg.partition()}], offset {msg.offset()}. "
+                          f"Size: {len(value_bytes) / (1024 * 1024):.2f} MB.")
+                    
+                    # --- Here's where you'd process your actual image/point-cloud data ---
+                    # Example: Simulate saving the data (replace with actual processing)
+                    # For practice, you could save it to a dummy file or pass to an image library
+                    
+                    # filename = f"received_data_{msg.topic()}_{msg.partition()}_{msg.offset()}.bin"
+                    # with open(filename, 'wb') as f:
+                    #     f.write(value_bytes)
+                    # print(f"Simulated: Saved {filename}")
+
+                else:
+                    print("Received message with no value (empty payload).")
+
+    except KeyboardInterrupt:
+        print("\nINFO: Consumer interrupted by user (Ctrl+C).")
+    except Exception as e:
+        print(f"CRITICAL ERROR: An unexpected error occurred: {e}")
+    finally:
+        # Close down consumer to commit final offsets and clean up resources
+        print("INFO: Closing consumer.")
+        consumer.close()
+
+# Call the function to start consuming
+consume_sensor_data()

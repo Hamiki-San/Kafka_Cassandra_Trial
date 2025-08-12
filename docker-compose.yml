@@ -1,0 +1,74 @@
+version: '3.8'
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  broker:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: broker
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://broker:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_MESSAGE_MAX_BYTES: 6291456
+      KAFKA_REPLICA_FETCH_MAX_BYTES: 6291456
+
+  cassandra:
+    image: cassandra:4.0
+    container_name: cassandra
+    ports:
+      - "9042:9042" # CQL native port
+    environment:
+      CASSANDRA_CLUSTER_NAME: "Mimic_dummy_data"
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -u cassandra -p cassandra --debug -e 'describe cluster' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  cassandra-web:
+    image: ipushc/cassandra-web
+    container_name: cassandra-web
+    ports:
+      - "3000:8083"
+    environment:
+      - CASSANDRA_HOST=cassandra
+      - CASSANDRA_PORT=9042
+      - CASSANDRA_USERNAME=cassandra
+      - CASSANDRA_PASSWORD=cassandra
+    depends_on:
+      cassandra:
+        condition: service_healthy
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest # Corrected image tag
+    container_name: kafka-ui
+    ports:
+      - "8080:8080" # Access Kafka UI in your browser at http://localhost:8080
+    environment:
+      KAFKA_CLUSTERS_0_NAME: "Local Kafka Cluster" # A friendly name for the UI
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "broker:29092" # Corrected to refer to your 'broker' service
+    depends_on:
+      - broker # Corrected to depend on your 'broker' service
+
+volumes:
+  zookeeper_data:
+  kafka_data:
+  cassandra_data:

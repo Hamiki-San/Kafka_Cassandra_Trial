@@ -1,0 +1,114 @@
+import time
+import json
+import random
+from confluent_kafka import Producer
+import os # For simulating large data
+
+# --- Configuration for your Producer ---
+# Make sure these match or are less than your broker's KAFKA_MESSAGE_MAX_BYTES
+# (which we set to 6MB in docker-compose.yml)
+MAX_MESSAGE_SIZE_BYTES = 6 * 1024 * 1024  # 6 MB
+
+producer_config = {
+    'bootstrap.servers': 'localhost:9092', # This is where your Kafka container is exposed
+    'client.id': 'image-producer-app',
+    'message.max.bytes': MAX_MESSAGE_SIZE_BYTES, # Producer-side max message size
+    # 'max.request.size': MAX_MESSAGE_SIZE_BYTES, 
+    'acks': 'all',                               # Ensure all in-sync replicas acknowledge
+    'compression.type': 'lz4'                    # Compress large messages for efficiency
+}
+
+producer = Producer(producer_config)
+
+# --- Define Kafka Topic and Message Size ---
+TOPIC_NAME = 'position_image'
+# We'll simulate a 5MB image/point-cloud.
+# For simplicity, we'll create a byte string of this size.
+# In a real scenario, this would be your actual image/point-cloud bytes.
+ASSUMED_DATA_SIZE_BYTES = 5 * 1024 * 1024 # 5 MB
+
+# --- Delivery Callback (important for understanding producer behavior) ---
+def delivery_report(err, msg):
+    """
+    Called once for each message produced to indicate delivery result.
+    Triggered by poll() or flush().
+    """
+    if err is not None:
+        print(f"ERROR: Message delivery failed: {err}")
+    else:
+        print(f"INFO: Message delivered to topic '{msg.topic()}' "
+              f"partition [{msg.partition()}] @ offset {msg.offset()}")
+
+# --- Producer Logic ---
+def produce_sensor_data(sensor_id_prefix="camera", num_messages=20, interval_sec=0.5):
+    """
+    Produces simulated large sensor data messages to Kafka.
+    2 Hz means 1 message every 0.5 seconds.
+    """
+    print(f"--- Starting Producer for Topic: {TOPIC_NAME} ---")
+    print(f"Producing {num_messages} messages at {1/interval_sec} Hz (1 message every {interval_sec} seconds).")
+    print(f"Each message payload is approximately {ASSUMED_DATA_SIZE_BYTES / (1024 * 1024):.2f} MB.")
+
+    for i in range(num_messages):
+        current_time_ms = int(time.time() * 1000)
+        sensor_id = f"{sensor_id_prefix}-{random.randint(0, 3)}"
+        
+        # Simulate your large image/point-cloud data as random bytes
+        # In a real app, you would load your actual image/point-cloud binary data here.
+        # Ensure your actual data is bytes (e.g., from reading a file in binary mode: with open('image.jpg', 'rb') as f: data_bytes = f.read())
+        simulated_large_data = os.urandom(ASSUMED_DATA_SIZE_BYTES) # Generates random bytes
+
+        # Create a simple metadata structure (optional, but good practice)
+        metadata = {
+            "sensor_id": sensor_id,
+            "timestamp_ms": current_time_ms,
+            "data_type": "image" if "camera" in sensor_id else "point_cloud",
+            "data_size_bytes": len(simulated_large_data),
+            # Add more relevant metadata here (e.g., location, frame_number)
+        }
+        # For simplicity, we'll send the raw large data as the message value
+        # and the metadata as the message key (Base64 encoded for safety if complex)
+        # Or, if you need the metadata for filtering, you can put it in the value
+        # and the large data in Object Storage, sending just a reference.
+
+        # Let's put metadata in the key (JSON) and large data in the value (raw bytes)
+        # Key should be small and often used for partitioning/ordering
+        message_key = json.dumps(metadata).encode('utf-8')
+        message_value = simulated_large_data # The large binary data itself
+
+        try:
+            producer.produce(
+                TOPIC_NAME,
+                key=message_key,
+                value=message_value,
+                callback=delivery_report
+            )
+            # Poll for callbacks to be invoked (non-blocking)
+            producer.poll(0)
+
+            print(f"Produced message {i+1}/{num_messages} from {sensor_id} "
+                  f"with {len(message_value) / (1024 * 1024):.2f} MB. Key length: {len(message_key)} bytes")
+
+        except BufferError:
+            print(f"WARN: Local producer queue is full ({len(producer)} messages awaiting delivery). "
+                  f"Retrying after flushing...")
+            producer.flush(timeout=1.0) # Try to force delivery
+            # If still full, you might need to increase 'queue.buffering.max.messages' or 'queue.buffering.max.kbytes'
+            producer.produce(
+                TOPIC_NAME,
+                key=message_key,
+                value=message_value,
+                callback=delivery_report
+            ) # Try again
+            producer.poll(0)
+
+        time.sleep(interval_sec)
+
+    # Wait for all outstanding messages to be delivered
+    # This is crucial in scripts to ensure messages are sent before exiting
+    print("Flushing final messages...")
+    producer.flush()
+    print("Producer finished sending messages. All messages should be delivered or failed.")
+
+# Call the function to start producing
+produce_sensor_data(num_messages=20, interval_sec=0.5) # Sends 10 messages over 5 seconds (2 Hz)

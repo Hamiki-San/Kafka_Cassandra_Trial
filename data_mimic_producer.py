@@ -29,6 +29,7 @@ if __name__ == '__main__':
 
             # Create a simple string message: "TIMESTAMP|HEX_DATA"
             message_value = f"{timestamp_ms}|{raw_hex_data}"
+            #message_value = f"{raw_hex_data}"
 
             # Send the message. It's asynchronous by default.
             # .get(timeout=10) can be used for synchronous sends, but we'll omit for simplicity.

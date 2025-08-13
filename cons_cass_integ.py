@@ -6,6 +6,10 @@ import logging
 from cassandra.cluster import Cluster
 from cassandra.auth import PlainTextAuthProvider
 import datetime
+import pytz
+
+# Define your local timezone for display purposes
+LOCAL_TIMEZONE = pytz.timezone('Europe/Berlin') 
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -76,7 +80,7 @@ consumer = KafkaConsumer(
     *ALL_KAFKA_TOPICS, # Subscribe to all relevant topics
     bootstrap_servers=KAFKA_BROKERS,
     group_id='raw_data_processing_group', # Ensure this is unique if you have multiple consumer instances
-    auto_offset_reset='earliest',
+    auto_offset_reset='latest',
     enable_auto_commit=True,
     value_deserializer=lambda x: x.decode('utf-8') # Decode message value from bytes to UTF-8 string
 )
@@ -107,13 +111,15 @@ def process_message_and_insert(message):
             # Convert timestamp from epoch string (milliseconds) to datetime object
             timestamp_ms = int(timestamp_str)
             event_timestamp = datetime.datetime.fromtimestamp(timestamp_ms / 1000, tz=datetime.timezone.utc)
+            localTime = event_timestamp.astimezone(LOCAL_TIMEZONE)
             
             # Data to insert into Cassandra. Order MUST match the prepared statement:
             # (key, timestamp, output_data)
             data_to_insert = (
                 sensor_id_for_cassandra, # This is the 'Key' column in Cassandra
-                # event_timestamp,         # This is the 'Timestamp' column
-                timestamp_ms,
+                #event_timestamp,         # This is the 'Timestamp' column
+                #timestamp_ms,
+                localTime,
                 raw_hex_data             # This is the 'output_data' column
             )
 
@@ -125,7 +131,7 @@ def process_message_and_insert(message):
 
             # Execute the prepared statement
             session.execute(prepared_stmt, data_to_insert)
-            logging.info(f"Inserted into {target_table}: Key='{sensor_id_for_cassandra}', Time='{event_timestamp}', Data='{raw_hex_data[:20]}...' (from topic {message.topic})")
+            logging.info(f"Inserted into {target_table}: Key='{sensor_id_for_cassandra}', Time='{localTime}', Offset={message.offset}, Data='{raw_hex_data[:20]}...' (from topic {message.topic})")
         else:
             logging.warning(f"Skipping malformed message from topic {message.topic}: {message.value}")
 

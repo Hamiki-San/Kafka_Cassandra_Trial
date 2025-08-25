@@ -32,15 +32,15 @@ KEYSPACE_NAME = 'sensor_data' # ADJUST: Your Cassandra keyspace name
 
 # Define the mapping from Kafka Topic Name to Cassandra Table Name and data column
 TOPIC_TO_TABLE_MAPPING = {
-    'blickfeld': {'table': 'blickfeld', 'data_column': 'pcd_data', 'sensor_id_for_cassandra': 'blickfeld'},
-    'helios1': {'table': 'helios1', 'data_column': 'pcd_data', 'sensor_id_for_cassandra': 'helios1'},
-    'helios2': {'table': 'helios2', 'data_column': 'pcd_data', 'sensor_id_for_cassandra': 'helios2'},
-    'lupus': {'table': 'lupus', 'data_column': 'image', 'sensor_id_for_cassandra': 'lupus'},
-    'dahua': {'table': 'dahua', 'data_column': 'image', 'sensor_id_for_cassandra': 'dahua'},
-    'zedx_top': {'table': 'zedx_top', 'data_column': 'image', 'sensor_id_for_cassandra': 'zedx_top'},
-    'zedx_bottom': {'table': 'zedx_bottom', 'data_column': 'image', 'sensor_id_for_cassandra': 'zedx_bottom'},
-    'zedx_l': {'table': 'zedx_l', 'data_column': 'image', 'sensor_id_for_cassandra': 'zedx_l'},
-    'zedx_r': {'table': 'zedx_r', 'data_column': 'image', 'sensor_id_for_cassandra': 'zedx_r'},
+    'blickfeld': {'table': 'blickfeld', 'data_column': 'payload', 'sensor_id_for_cassandra': 'blickfeld'},
+    'helios_1': {'table': 'helios_1', 'data_column': 'payload', 'sensor_id_for_cassandra': 'helios_1'},
+    'helios_2': {'table': 'helios_2', 'data_column': 'payload', 'sensor_id_for_cassandra': 'helios_2'},
+    'lupus': {'table': 'lupus', 'data_column': 'payload', 'sensor_id_for_cassandra': 'lupus'},
+    'dahua': {'table': 'dahua', 'data_column': 'payload', 'sensor_id_for_cassandra': 'dahua'},
+    'zedx_top': {'table': 'zedx_top', 'data_column': 'payload', 'sensor_id_for_cassandra': 'zedx_top'},
+    'zedx_bottom': {'table': 'zedx_bottom', 'data_column': 'payload', 'sensor_id_for_cassandra': 'zedx_bottom'},
+    'zedx_left': {'table': 'zedx_left', 'data_column': 'payload', 'sensor_id_for_cassandra': 'zedx_left'},
+    'zedx_right': {'table': 'zedx_right', 'data_column': 'payload', 'sensor_id_for_cassandra': 'zedx_right'},
 }
 ALL_KAFKA_TOPICS = list(TOPIC_TO_TABLE_MAPPING.keys())
 
@@ -111,7 +111,7 @@ class KafkaCassandraConsumer:
             data_column = config['data_column']
 
             INSERT_CQL = f"""
-            INSERT INTO {table_name} (sensor_id, timestamp, {data_column})
+            INSERT INTO {table_name} (sensor_id, event_created, {data_column})
             VALUES (?, ?, ?);
             """
             self.prepared_statements[table_name] = self.cassandra_session.prepare(INSERT_CQL)
@@ -153,7 +153,7 @@ class KafkaCassandraConsumer:
                     logging.error(f"Prepared statement not found for table '{target_table}'. This indicates a setup error.")
                     continue
 
-                if topic in ["blickfeld", "helios1", "helios2"]:
+                if topic in ["blickfeld", "helios_1", "helios_2"]:
                     # PCD Data - Store as a file and insert file path
                     # MODIFIED: Added sensor_id_for_cassandra as a subdirectory
                     file_path = os.path.join(BASE_DATA_DIR, "pcd_data", sensor_id_for_cassandra, f"{sensor_id_for_cassandra}_{formatted_timestamp}.pcd")
@@ -163,7 +163,7 @@ class KafkaCassandraConsumer:
                         self.cassandra_session.execute(prepared_stmt, (sensor_id_for_cassandra, timestamp_for_storage, file_path))
                         logging.info(f"Stored PCD file: {file_path}")
 
-                elif topic in ["lupus", "dahua", "zedx_l", "zedx_r", "zedx_top", "zedx_bottom"]:
+                elif topic in ["lupus", "dahua", "zedx_left", "zedx_right", "zedx_top", "zedx_bottom"]:
                     last_timestamp = self.last_saved_timestamp.get(sensor_id_for_cassandra, None)
 
                     if last_timestamp is None or (timestamp_for_storage - last_timestamp).total_seconds() >= 0.5:
@@ -220,12 +220,12 @@ class KafkaCassandraConsumer:
 
 if __name__ == "__main__":
     kafka_brokers = "localhost:9092" # ADJUST: Your Kafka broker address
-    cassandra_host_ip = "127.0.0.1" # ADJUST: Your Cassandra host IP
+    cassandra_host_ip = "localhost" # ADJUST: Your Cassandra host IP
 
     kafka_topics = [
-        "zedx_top", "zedx_bottom", "zedx_l", "zedx_r",
+        "zedx_top", "zedx_bottom", "zedx_left", "zedx_right",
         "lupus", "dahua",
-        "blickfeld", "helios1", "helios2",
+        "blickfeld", "helios_1", "helios_2",
     ]
 
     consumer_app = KafkaCassandraConsumer(kafka_brokers, kafka_topics, cassandra_host=cassandra_host_ip)

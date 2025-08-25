@@ -68,7 +68,22 @@ services:
     depends_on:
       - broker # Corrected to depend on your 'broker' service
 
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    environment:
+      MINIO_ROOT_USER: fastgate
+      MINIO_ROOT_PASSWORD: fastgate
+    command: server /data --console-address ":9001"
+
 volumes:
   zookeeper_data:
   kafka_data:
   cassandra_data:
+  minio_data:
+  

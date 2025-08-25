@@ -20,14 +20,17 @@ CASSANDRA_HOSTS = ['localhost']
 CASSANDRA_PORT = 9042
 CASSANDRA_USERNAME = 'cassandra'
 CASSANDRA_PASSWORD = 'cassandra'
-KEYSPACE_NAME = 'mimic_data' # Ensure this matches your keyspace name
+KEYSPACE_NAME = 'sensor_data' # Ensure this matches your keyspace name
 
 # Define the mapping from Kafka Topic Name to Cassandra Table Name
 # This dictionary also helps in extracting the 'Key' (sensor_id) for Cassandra
 TOPIC_TO_TABLE_MAPPING = {
-    'sensor_1_raw_data': {'table': 'data_sensor1', 'sensor_id_for_cassandra': 'sensor_1'},
-    'sensor_2_raw_data': {'table': 'data_sensor2', 'sensor_id_for_cassandra': 'sensor_2'},
-    'sensor_3_raw_data': {'table': 'data_sensor3', 'sensor_id_for_cassandra': 'sensor_3'},
+    #'sensor_1_raw_data': {'table': 'data_sensor1', 'sensor_id_for_cassandra': 'sensor_1'},
+    #'sensor_2_raw_data': {'table': 'data_sensor2', 'sensor_id_for_cassandra': 'sensor_2'},
+    #'sensor_3_raw_data': {'table': 'data_sensor3', 'sensor_id_for_cassandra': 'sensor_3'},
+    'blickfeld': {'table': 'blickfeld', 'sensor_id_for_cassandra': 'blickfeld'},
+    'helios1': {'table': 'helios1', 'sensor_id_for_cassandra': 'helios1'},
+    'helios2': {'table': 'helios2', 'sensor_id_for_cassandra': 'helios2'},
 }
 ALL_KAFKA_TOPICS = list(TOPIC_TO_TABLE_MAPPING.keys()) # Get all topics to subscribe to
 

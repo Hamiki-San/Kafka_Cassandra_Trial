@@ -8,7 +8,7 @@ CASSANDRA_USERNAME = 'cassandra'
 CASSANDRA_PASSWORD = 'cassandra'
 KEYSPACE_NAME = 'sensor_data'
 
-# --- MinIO Configuration ---
+# --- MinIO Configuration --- // object-storage is for storing large files like PCD and images only.
 MINIO_ENDPOINT = "localhost:9000"
 MINIO_ACCESS_KEY = "fastgate"
 MINIO_SECRET_KEY = "fastgate"
@@ -16,7 +16,7 @@ MINIO_SECURE = False
 MINIO_PCD_BUCKET = "pcd-data"
 MINIO_IMAGE_BUCKET = "image-data"
 
-# --- Sensor to Table Mapping ---
+# --- Sensor to Table Mapping --- // this part has to be done amnually according to every topics that is available to consume on Kafka.
 TOPIC_TO_TABLE_MAPPING = {
     'blickfeld': {'table': 'blickfeld', 'data_column': 'payload', 'sensor_id_for_cassandra': 'blickfeld'},
     'helios_1': {'table': 'helios_1', 'data_column': 'payload', 'sensor_id_for_cassandra': 'helios_1'},
@@ -27,6 +27,7 @@ TOPIC_TO_TABLE_MAPPING = {
     'zedx_bottom': {'table': 'zedx_bottom', 'data_column': 'payload', 'sensor_id_for_cassandra': 'zedx_bottom'},
     'zedx_left': {'table': 'zedx_left', 'data_column': 'payload', 'sensor_id_for_cassandra': 'zedx_left'},
     'zedx_right': {'table': 'zedx_right', 'data_column': 'payload', 'sensor_id_for_cassandra': 'zedx_right'},
+    'flightradar-data': {'table': 'flight_raw_data', 'data_column': 'payload', 'sensor_id_for_cassandra': 'flightradar'},
 }
 
 # --- Automatically generated list of Kafka topics ---

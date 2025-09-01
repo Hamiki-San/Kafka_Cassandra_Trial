@@ -10,7 +10,7 @@ KEYSPACE_NAME = 'sensor_data'
 
 # --- MinIO Configuration --- // object-storage is for storing large files like PCD and images only.
 # MINIO_ENDPOINT = "localhost:9000"
-MINIO_ENDPOINT = "192.168.201.29:9001" # WiFi IEM
+MINIO_ENDPOINT = "192.168.201.29:9000" # WiFi IEM, how save is this?
 MINIO_ACCESS_KEY = "fastgate"
 MINIO_SECRET_KEY = "fastgate"
 MINIO_SECURE = False

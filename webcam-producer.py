@@ -31,7 +31,7 @@ except Exception as e:
 # --- Initialize Webcam ---
 # cv2.VideoCapture(0) accesses the default webcam.
 # If you have multiple webcams, you might need to change the number (e.g., 1, 2, etc.).
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 if not cap.isOpened():
     logging.error("Error: Could not open webcam.")
     exit()

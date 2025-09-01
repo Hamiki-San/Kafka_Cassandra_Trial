@@ -2,7 +2,7 @@ import time
 from kafka import KafkaConsumer
 import sys
 import logging
-import os # <--- Make sure this is imported!
+import os
 from cassandra.cluster import Cluster
 from cassandra.auth import PlainTextAuthProvider
 from datetime import datetime, timezone
@@ -41,7 +41,11 @@ TOPIC_TO_TABLE_MAPPING = {
     'zedx_bottom': {'table': 'zedx_bottom', 'data_column': 'payload', 'sensor_id_for_cassandra': 'zedx_bottom'},
     'zedx_left': {'table': 'zedx_left', 'data_column': 'payload', 'sensor_id_for_cassandra': 'zedx_left'},
     'zedx_right': {'table': 'zedx_right', 'data_column': 'payload', 'sensor_id_for_cassandra': 'zedx_right'},
+    'webcam-stream': {'table': 'webcam', 'data_column': 'payload', 'sensor_id_for_cassandra': 'webcam-stream'},
+    'flightradar-data': {'table': 'flight_raw_data', 'data_column': 'payload', 'sensor_id_for_cassandra': 'flightradar'},
 }
+
+# Add all topics to the list
 ALL_KAFKA_TOPICS = list(TOPIC_TO_TABLE_MAPPING.keys())
 
 cluster = None
@@ -110,8 +114,9 @@ class KafkaCassandraConsumer:
             table_name = config['table']
             data_column = config['data_column']
 
+            # MODIFIED: Changed 'sensor_id' to 'topic' to match the new schema
             INSERT_CQL = f"""
-            INSERT INTO {table_name} (sensor_id, event_created, {data_column})
+            INSERT INTO {table_name} (topic, event_created, {data_column})
             VALUES (?, ?, ?);
             """
             self.prepared_statements[table_name] = self.cassandra_session.prepare(INSERT_CQL)
@@ -126,7 +131,7 @@ class KafkaCassandraConsumer:
         if not self.setup_kafka_consumer():
             logging.error("Exiting as Kafka consumer could not be established.")
             sys.exit(1)
-
+        
         logging.info(f"Starting Kafka consumer on brokers: '{self.brokers}' for topics: {self.topics}")
 
         try:
@@ -155,30 +160,41 @@ class KafkaCassandraConsumer:
 
                 if topic in ["blickfeld", "helios_1", "helios_2"]:
                     # PCD Data - Store as a file and insert file path
-                    # MODIFIED: Added sensor_id_for_cassandra as a subdirectory
                     file_path = os.path.join(BASE_DATA_DIR, "pcd_data", sensor_id_for_cassandra, f"{sensor_id_for_cassandra}_{formatted_timestamp}.pcd")
                     self.save_file(file_path, payload)
 
                     if not self.cassandra_session.is_shutdown:
-                        self.cassandra_session.execute(prepared_stmt, (sensor_id_for_cassandra, timestamp_for_storage, file_path))
+                        # MODIFIED: Using 'topic' directly in the execute call
+                        self.cassandra_session.execute(prepared_stmt, (topic, timestamp_for_storage, file_path))
                         logging.info(f"Stored PCD file: {file_path}")
 
-                elif topic in ["lupus", "dahua", "zedx_left", "zedx_right", "zedx_top", "zedx_bottom"]:
+                elif topic in ["lupus", "dahua", "zedx_left", "zedx_right", "zedx_top", "zedx_bottom", "webcam-stream"]:
                     last_timestamp = self.last_saved_timestamp.get(sensor_id_for_cassandra, None)
 
                     if last_timestamp is None or (timestamp_for_storage - last_timestamp).total_seconds() >= 0.5:
                         # Image Data - Store as a file and insert file path
-                        # MODIFIED: Added sensor_id_for_cassandra as a subdirectory
                         img_path = os.path.join(BASE_DATA_DIR, "img_data", sensor_id_for_cassandra, f"{sensor_id_for_cassandra}_{formatted_timestamp}.jpg")
                         self.save_file(img_path, payload)
 
                         if not self.cassandra_session.is_shutdown:
-                            self.cassandra_session.execute(prepared_stmt, (sensor_id_for_cassandra, timestamp_for_storage, img_path))
+                            # MODIFIED: Using 'topic' directly in the execute call
+                            self.cassandra_session.execute(prepared_stmt, (topic, timestamp_for_storage, img_path))
                             logging.info(f"Stored Image Data for {sensor_id_for_cassandra}: {img_path}")
 
                         self.last_saved_timestamp[sensor_id_for_cassandra] = timestamp_for_storage
                     else:
                         logging.info(f"Skipping image for {sensor_id_for_cassandra} at {timestamp_for_storage}, within 0.5s window.")
+                
+                elif topic == "flightradar-data":
+                    # Text/JSON Data - Decode and insert payload directly
+                    try:
+                        decoded_payload = payload.decode('utf-8')
+                        if not self.cassandra_session.is_shutdown:
+                            # MODIFIED: Using 'topic' directly in the execute call
+                            self.cassandra_session.execute(prepared_stmt, (topic, timestamp_for_storage, decoded_payload))
+                            logging.info(f"Stored Text Data for {sensor_id_for_cassandra}: {decoded_payload[:50]}...")
+                    except UnicodeDecodeError:
+                        logging.error(f"Failed to decode payload for topic {topic}. Skipping.")
 
                 else:
                     logging.warning(f"Received message from unhandled topic: {topic}. Skipping.")
@@ -226,6 +242,8 @@ if __name__ == "__main__":
         "zedx_top", "zedx_bottom", "zedx_left", "zedx_right",
         "lupus", "dahua",
         "blickfeld", "helios_1", "helios_2",
+        "webcam-stream",
+        "flightradar-data"
     ]
 
     consumer_app = KafkaCassandraConsumer(kafka_brokers, kafka_topics, cassandra_host=cassandra_host_ip)

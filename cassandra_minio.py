@@ -142,7 +142,7 @@ class KafkaCassandraConsumer:
             data_column = config_map['data_column']
 
             INSERT_CQL = f"""
-            INSERT INTO {consumer_config.KEYSPACE_NAME}.{table_name} (sensor_id, event_created, {data_column})
+            INSERT INTO {consumer_config.KEYSPACE_NAME}.{table_name} (topic, event_created, {data_column})
             VALUES (?, ?, ?);
             """
             self.prepared_statements[table_name] = self.cassandra_session.prepare(INSERT_CQL)
@@ -194,7 +194,7 @@ class KafkaCassandraConsumer:
                         self.cassandra_session.execute(prepared_stmt, (sensor_id_for_cassandra, timestamp_for_storage, minio_uri))
                         logging.info(f"Stored PCD object URI: {minio_uri}")
                 
-                elif topic in ["lupus", "dahua", "zedx_left", "zedx_right", "zedx_top", "zedx_bottom"]:
+                elif topic in ["lupus", "dahua", "zedx_left", "zedx_right", "zedx_top", "webcam-stream", "zedx_bottom"]:
                     last_timestamp = self.last_saved_timestamp.get(sensor_id_for_cassandra, None)
 
                     if last_timestamp is None or (timestamp_for_storage - last_timestamp).total_seconds() >= 0.5:

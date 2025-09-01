@@ -9,7 +9,8 @@ CASSANDRA_PASSWORD = 'cassandra'
 KEYSPACE_NAME = 'sensor_data'
 
 # --- MinIO Configuration --- // object-storage is for storing large files like PCD and images only.
-MINIO_ENDPOINT = "localhost:9000"
+# MINIO_ENDPOINT = "localhost:9000"
+MINIO_ENDPOINT = "192.168.201.29:9001" # WiFi IEM
 MINIO_ACCESS_KEY = "fastgate"
 MINIO_SECRET_KEY = "fastgate"
 MINIO_SECURE = False
@@ -28,6 +29,8 @@ TOPIC_TO_TABLE_MAPPING = {
     'zedx_left': {'table': 'zedx_left', 'data_column': 'payload', 'sensor_id_for_cassandra': 'zedx_left'},
     'zedx_right': {'table': 'zedx_right', 'data_column': 'payload', 'sensor_id_for_cassandra': 'zedx_right'},
     'flightradar-data': {'table': 'flight_raw_data', 'data_column': 'payload', 'sensor_id_for_cassandra': 'flightradar'},
+    'webcam-stream': {'table': 'webcam', 'data_column': 'payload', 'sensor_id_for_cassandra': 'Webcam'},
+    #'<kafka-topic>': {'table': '<table-name>', 'data_column': 'payload', 'sensor_id_for_cassandra': '<cassandara-sensor-id>'},
 }
 
 # --- Automatically generated list of Kafka topics ---

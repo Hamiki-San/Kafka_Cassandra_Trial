@@ -17,7 +17,7 @@ MINIO_SECURE = False
 MINIO_PCD_BUCKET = "pcd-data"
 MINIO_IMAGE_BUCKET = "image-data"
 
-# --- Sensor to Table Mapping --- // this part has to be done amnually according to every topics that is available to consume on Kafka.
+# --- Sensor to Table Mapping --- // this part has to be done manually according to every topics that is available to consume on Kafka. // configure according to the dummy datacentre topic's
 TOPIC_TO_TABLE_MAPPING = {
     'blickfeld': {'table': 'blickfeld', 'data_column': 'payload', 'sensor_id_for_cassandra': 'blickfeld'},
     'helios_1': {'table': 'helios_1', 'data_column': 'payload', 'sensor_id_for_cassandra': 'helios_1'},
